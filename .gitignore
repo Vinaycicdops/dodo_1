@@ -3,3 +3,5 @@ ledger-api-src/deploy/secrets.yaml
 
 # Ignore internal assessment/session instructions
 TASK_INSTRUCTIONS.md
+
+cosign.*
