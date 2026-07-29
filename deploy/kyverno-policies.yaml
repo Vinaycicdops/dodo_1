@@ -12,6 +12,15 @@ spec:
   background: true
   rules:
     - name: check-run-as-non-root
+      exclude:
+        any:
+          - resources:
+              namespaces:
+                - kube-system
+                - kyverno
+                - argocd
+                - ingress-nginx
+                - argo-rollouts
       match:
         any:
           - resources:
@@ -38,6 +47,15 @@ spec:
   background: true
   rules:
     - name: check-latest-tag
+      exclude:
+        any:
+          - resources:
+              namespaces:
+                - kube-system
+                - kyverno
+                - argocd
+                - ingress-nginx
+                - argo-rollouts
       match:
         any:
           - resources:

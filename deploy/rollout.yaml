@@ -1,0 +1,72 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: ledger-api
+  namespace: ledger-api
+spec:
+  replicas: 3
+  strategy:
+    canary:
+      # Step-by-step promotion instructions
+      steps:
+        # Route 20% of traffic to the new version (Canary)
+        - setWeight: 20
+        # Pause for manual validation/testing before proceeding
+        - pause: { duration: 5m }
+        # Route 50% of traffic
+        - setWeight: 50
+        - pause: { duration: 2m }
+        # Route 100% of traffic (fully promoted)
+        - setWeight: 100
+  revisionHistoryLimit: 3
+  selector:
+    matchLabels:
+      app: ledger-api
+  template:
+    metadata:
+      labels:
+        app: ledger-api
+    spec:
+      serviceAccountName: ledger-api
+      securityContext:
+        runAsGroup: 10001
+        runAsNonRoot: true
+        runAsUser: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      volumes:
+        - emptyDir: {}
+          name: tmp
+      containers:
+        - name: ledger-api
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          image: ghcr.io/vinaycicdops/dodo_1:92c36b0ace2e27291e202cd57aac7ca99f4a0eb1b48c359e15b925515d37a111
+          ports:
+            - containerPort: 8080
+              name: http
+          envFrom:
+            - configMapRef:
+                name: ledger-api-config
+            - secretRef:
+                name: ledger-api-secret
+          readinessProbe:
+            httpGet:
+              port: 8080
+              path: /health
+            initialDelaySeconds: 10
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              port: 8080
+              path: /health
+            initialDelaySeconds: 10
+            periodSeconds: 5
+          volumeMounts:
+            - mountPath: /tmp
+              name: tmp
