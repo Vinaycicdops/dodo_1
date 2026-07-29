@@ -23,6 +23,12 @@ jobs:
         with:
           fetch-depth: 0 # Required for Gitleaks scan to inspect git history
 
+      # Helper: Convert repository path to lowercase for GHCR
+      - name: Lowercase Repository Name
+        id: string
+        run: |
+          echo "repo_lowercase=${GITHUB_REPOSITORY,,}" >> $GITHUB_OUTPUT
+
       # 2. Run Gitleaks Secret Scan (Security Gate)
       - name: Run Gitleaks Secrets Scan
         uses: gitleaks/gitleaks-action@v2
@@ -67,7 +73,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/${{ github.repository }}
+          images: ghcr.io/${{ steps.string.outputs.repo_lowercase }}
 
       # 9. Build and Push Docker Image to GHCR
       - name: Build and Push Docker Image
@@ -77,15 +83,15 @@ jobs:
           context: ./app
           push: true
           tags: |
-            ghcr.io/${{ github.repository }}:${{ github.sha }}
-            ghcr.io/${{ github.repository }}:latest
+            ghcr.io/${{ steps.string.outputs.repo_lowercase }}:${{ github.sha }}
+            ghcr.io/${{ steps.string.outputs.repo_lowercase }}:latest
           labels: ${{ steps.meta.outputs.labels }}
 
       # 10. Run Trivy Image Scan (Container CVE Scan Gate)
       - name: Run Trivy Image Scan
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: 'ghcr.io/${{ github.repository }}:${{ github.sha }}'
+          image-ref: 'ghcr.io/${{ steps.string.outputs.repo_lowercase }}:${{ github.sha }}'
           format: 'table'
           exit-code: '0'
           severity: 'CRITICAL,HIGH'
@@ -94,7 +100,7 @@ jobs:
       - name: Generate SLSA Build Provenance
         uses: actions/attest-build-provenance@v1
         with:
-          subject-name: ghcr.io/${{ github.repository }}
+          subject-name: ghcr.io/${{ steps.string.outputs.repo_lowercase }}
           subject-digest: ${{ steps.build-push.outputs.digest }}
           push-to-registry: true
 
@@ -103,4 +109,4 @@ jobs:
         if: ${{ success() }}
         run: |
           # Signs the image keylessly using the GitHub OIDC Identity token
-          cosign sign --yes "ghcr.io/${{ github.repository }}@${{ steps.build-push.outputs.digest }}"
+          cosign sign --yes "ghcr.io/${{ steps.string.outputs.repo_lowercase }}@${{ steps.build-push.outputs.digest }}"
