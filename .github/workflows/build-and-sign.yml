@@ -34,7 +34,7 @@ jobs:
         run: |
           wget https://github.com/gitleaks/gitleaks/releases/download/v8.18.2/gitleaks_8.18.2_linux_x64.tar.gz
           tar -zxvf gitleaks_8.18.2_linux_x64.tar.gz
-          ./gitleaks detect --verbose --redact || true # Set to true initially so mock secrets in git don't break the build
+          ./gitleaks detect --verbose --redact 
 
       # 3. Run Semgrep SAST Scan (Security Gate)
       - name: Run Semgrep SAST Scan

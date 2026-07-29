@@ -28,6 +28,8 @@ spec:
         app: ledger-api
     spec:
       serviceAccountName: ledger-api
+      imagePullSecrets:
+        - name: ghcr-secret
       securityContext:
         runAsGroup: 10001
         runAsNonRoot: true

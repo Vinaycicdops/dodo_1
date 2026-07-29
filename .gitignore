@@ -1,5 +1,5 @@
 # Ignore local credentials manifest
-ledger-api-src/deploy/secrets.yaml
+deploy/secrets.yaml
 
 # Ignore internal assessment/session instructions
 TASK_INSTRUCTIONS.md
