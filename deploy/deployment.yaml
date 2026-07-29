@@ -118,7 +118,7 @@ spec:
             capabilities:
               drop: 
                 - ALL
-          image: crysis307/ledger-api:v4
+          image: crysis307/ledger-api:f2a9f3cd39c26f045216582842bd125ee212bb82
           ports:
           - containerPort: 8080
             name: http

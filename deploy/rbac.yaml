@@ -1,0 +1,102 @@
+# Admin Persona - Full control over the ledger-api namespace
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: namespace-admin
+  namespace: ledger-api
+rules:
+  - apiGroups: ["*"]
+    resources: ["*"]
+    verbs: ["*"]
+---
+# Developer Persona - Write access to code/manifests, but restricted from deleting namespaces or cluster roles
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: namespace-developer
+  namespace: ledger-api
+rules:
+  - apiGroups: ["", "apps", "networking.k8s.io"]
+    resources:
+      - deployments
+      - services
+      - ingresses
+      - configmaps
+      - secrets
+      - pods
+      - pods/log
+    verbs:
+      - get
+      - list
+      - watch
+      - create
+      - update
+      - patch
+      - delete
+---
+# Operator Persona - Read-only visibility + permission to execute commands, port-forward, and scale workloads
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: namespace-operator
+  namespace: ledger-api
+rules:
+  # Read-only access to view all resources and logs
+  - apiGroups: ["", "apps", "networking.k8s.io"]
+    resources:
+      - deployments
+      - services
+      - ingresses
+      - configmaps
+      - pods
+      - pods/log
+    verbs:
+      - get
+      - list
+      - watch
+  # Troubleshooting and scaling access (exec, port-forward, and scaling deployments)
+  - apiGroups: [""]
+    resources:
+      - pods/portforward
+    verbs:
+      - create
+---
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: admin-binding
+  namespace: ledger-api
+subjects:
+- kind: User
+  name: namespace-admin
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: namespace-admin
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: developer-binding
+  namespace: ledger-api
+subjects:
+- kind: User
+  name: namespace-developer
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: namespace-developer
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: operator-binding
+  namespace: ledger-api
+subjects:
+- kind: User
+  name: namespace-operator
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: namespace-operator
