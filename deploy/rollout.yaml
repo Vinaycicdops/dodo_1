@@ -48,7 +48,7 @@ spec:
             capabilities:
               drop:
                 - ALL
-          image: ghcr.io/vinaycicdops/dodo_1:92c36b0ace2e27291e202cd57aac7ca99f4a0eb1b48c359e15b925515d37a111
+          image: ghcr.io/vinaycicdops/dodo_1:fa89e230dfec51724a175cfa152d91d7f3ebb7a5
           ports:
             - containerPort: 8080
               name: http
