@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ledger-api-config
+  namespace: ledger-api
+data:
+  FLASK_ENV: "production"
+  PORT: "8080"
+  STRIPE_API_KEY: "REMOVED_STRIPE_KEY"
+  DB_PASSWORD: "REMOVED_DB_PASSWORD"

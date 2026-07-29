@@ -1,0 +1,146 @@
+
+# apiVersion: apps/v1
+# kind: Deployment
+# metadata:
+#   name: ledger-api
+#   namespace: payments
+#   labels:
+#     app: ledger-api
+# spec:
+#   replicas: 3
+#   selector:
+#     matchLabels:
+#       app: ledger-api
+#   template:
+#     metadata:
+#       labels:
+#         app: ledger-api
+#     spec:
+#       serviceAccountName: ledger-api-sa
+#       securityContext:
+#         runAsNonRoot: true
+#         runAsUser: 10001
+#         runAsGroup: 10001
+#         fsGroup: 10001
+#         seccompProfile:
+#           type: RuntimeDefault
+#       containers:
+#         - name: ledger-api
+#           image: crysis307/ledger-api:v1
+#           imagePullPolicy: IfNotPresent
+#           securityContext:
+#             allowPrivilegeEscalation: false
+#             readOnlyRootFilesystem: true
+#             capabilities:
+#               drop:
+#                 - ALL
+#           env:
+#             - name: FLASK_ENV
+#               valueFrom:
+#                 configMapKeyRef:
+#                   name: ledger-api-config
+#                   key: FLASK_ENV
+#             - name: PORT
+#               valueFrom:
+#                 configMapKeyRef:
+#                   name: ledger-api-config
+#                   key: PORT
+#             - name: PYTHONDONTWRITEBYTECODE
+#               value: "1"
+#             - name: STRIPE_API_KEY
+#               valueFrom:
+#                 secretKeyRef:
+#                   name: ledger-api-secrets
+#                   key: stripe-api-key
+#             - name: DB_PASSWORD
+#               valueFrom:
+#                 secretKeyRef:
+#                   name: ledger-api-secrets
+#                   key: db-password
+#           ports:
+#             - containerPort: 8080
+#               name: http
+#           resources:
+#             requests:
+#               cpu: 100m
+#               memory: 128Mi
+#             limits:
+#               cpu: 200m
+#               memory: 256Mi
+#           livenessProbe:
+#             httpGet:
+#               path: /health
+#               port: 8080
+#             initialDelaySeconds: 5
+#             periodSeconds: 10
+#           readinessProbe:
+#             httpGet:
+#               path: /health
+#               port: 8080
+#             initialDelaySeconds: 5
+#             periodSeconds: 10
+
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ledger-api
+  namespace: ledger-api
+  labels:
+    app: ledger-api
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: ledger-api
+  template:
+    metadata:
+      labels:
+        app: ledger-api
+    spec:
+      serviceAccountName: ledger-api
+      securityContext:
+        runAsGroup: 10001
+        runAsNonRoot: true
+        runAsUser: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      volumes:
+      - emptyDir: {}
+        name: tmp
+      containers:
+        - name: ledger-api
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: 
+                - ALL
+          image: crysis307/ledger-api:v4
+          ports:
+          - containerPort: 8080
+            name: http
+          envFrom:
+          - configMapRef:
+              name: ledger-api-config
+
+          - secretRef:
+              name: ledger-api-secret
+          readinessProbe:
+            httpGet:
+              port: 8080
+              path: /health
+            initialDelaySeconds: 10
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              port: 8080
+              path: /health
+            initialDelaySeconds: 10
+            periodSeconds: 5
+          volumeMounts:
+          - mountPath: /tmp
+            name: tmp
+
