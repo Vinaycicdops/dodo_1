@@ -4,10 +4,10 @@ metadata:
   name: ledger-api
   labels:
     istio-injection: enabled
-    # Enforce baseline to allow Istio sidecars to initialize successfully
-    pod-security.kubernetes.io/enforce: baseline
+    # Enforce privileged to allow istio-init containers to configure iptables (NET_ADMIN)
+    pod-security.kubernetes.io/enforce: privileged
     pod-security.kubernetes.io/enforce-version: latest
-    # Warn and Audit on restricted to surface security recommendations
+    # Warn and Audit on restricted to identify any workload security warnings
     pod-security.kubernetes.io/warn: restricted
     pod-security.kubernetes.io/warn-version: latest
     pod-security.kubernetes.io/audit: restricted
