@@ -37,7 +37,22 @@ Defined three distinct personas inside [deploy/rbac.yaml](deploy/rbac.yaml) to e
 
 We built a secure pipeline using GitHub Actions ([.github/workflows/build-and-sign.yml](.github/workflows/build-and-sign.yml)) targeting **GitHub Container Registry (GHCR)**.
 
-### 1. Security Gates & Fail Policies
+### 1. CI/CD Pipeline Architecture
+```mermaid
+graph LR
+    subgraph GitHub Actions Runner
+        A[Git Commit] --> B[Gitleaks Secret Scan]
+        B --> C[Semgrep SAST Scan]
+        C --> D[Trivy Vulnerability Scan]
+        D --> E[Docker Image Build]
+        E --> F[Trivy Image Scan]
+        F --> G[Generate SLSA Provenance]
+        G --> H[Cosign Keyless Signing]
+    end
+    H --> I[(GitHub Container Registry)]
+```
+
+### 2. Security Gates & Fail Policies
 
 | Security Gate | Scanning Tool | Fail Policy (Hard-Block) | Warning Policy (Log & Continue) |
 | :--- | :--- | :--- | :--- |
@@ -46,12 +61,12 @@ We built a secure pipeline using GitHub Actions ([.github/workflows/build-and-si
 | **Dependency & CVE Scan** | `Trivy FS` | **Block (`exit-code: 1`):** Any `CRITICAL` or `HIGH` vulnerabilities in `requirements.txt` dependencies **that have a patch available**. | **Warn (`exit-code: 0`):** `MEDIUM` or `LOW` vulnerabilities, or any CVE without an upstream fix. |
 | **Image Vulnerability Scan** | `Trivy Image` | **Block (`exit-code: 1`):** Any `CRITICAL` vulnerability in the container base OS packages or python packages **that has a patch available**. | **Warn (`exit-code: 0`):** `HIGH`, `MEDIUM`, or `LOW` OS package vulnerabilities. |
 
-### 2. Handling CVEs with No Upstream Fix
+### 3. Handling CVEs with No Upstream Fix
 To prevent build locks on external vulnerabilities without a maintainer patch:
 1. **Ignore-Unfixed:** The Trivy image scanner uses `ignore-unfixed: true` to flag unpatched CVEs as warnings instead of failing the pipeline.
 2. **Policy Exceptions:** Highly critical exceptions are documented and explicitly bypassed via a `.trivyignore` file with target resolution dates.
 
-### 3. Supply Chain Security (SLSA & Keyless Signing)
+### 4. Supply Chain Security (SLSA & Keyless Signing)
 On successful build, the runner automatically:
 1. **Generates SLSA Provenance Attestation** using GitHub's native `actions/attest-build-provenance` action.
 2. **Signs the Image Keylessly** with Cosign using the runner's GitHub OIDC token identity.
@@ -74,9 +89,37 @@ We enforce three ClusterPolicies in [deploy/kyverno-policies.yaml](deploy/kyvern
 
 ## Task 3 — Service Mesh & Zero-Trust (Istio)
 
-### Workload Identity Architecture (SPIFFE/mTLS)
+### 1. Zero-Trust Mesh & Network Architecture
+```mermaid
+graph TD
+    Client([External Client]) -- HTTPS:443 (TLS Terminated) --> IG[Istio Ingress Gateway]
+    
+    subgraph Service Mesh Namespace (ledger-api)
+        direction TB
+        
+        subgraph ledger-api-rollout Pod
+            EnvoyAPI[Envoy Sidecar Proxy] -- Localhost Loopback --> AppContainer[ledger-api Container]
+        end
 
-#### 1. Certificate Issuance & Identity Projection
+        subgraph reporting Pod
+            ClientContainer[reporting Container] -- Localhost Loopback --> EnvoyReporting[Envoy Sidecar Proxy]
+        end
+    end
+
+    IG -- mTLS STRICT (SPIFFE ID Verification) --> EnvoyAPI
+    EnvoyReporting -- mTLS STRICT (SPIFFE ID Verification) --> EnvoyAPI
+    
+    %% NetworkPolicy Blocking
+    subgraph Linux Kernel (CNI level)
+        NP[NetworkPolicy Default Deny]
+    end
+
+    NP -. Blocks non-mesh traffic .-> EnvoyAPI
+```
+
+### 2. Workload Identity Architecture (SPIFFE/mTLS)
+
+#### A. Certificate Issuance & Identity Projection
 * Each pod is injected with an `istio-proxy` sidecar containing the `istio-agent` daemon.
 * On startup, `istio-agent` constructs a standard **Certificate Signing Request (CSR)** and generates a private key.
 * `istio-agent` sends this CSR to the central Control Plane CA (`istiod`) over a secure gRPC connection.
@@ -85,14 +128,39 @@ We enforce three ClusterPolicies in [deploy/kyverno-policies.yaml](deploy/kyvern
 * The issued certificate contains a **Subject Alternative Name (SAN)** representing the workload's cryptographic identity using the **SPIFFE ID** standard, e.g., `spiffe://cluster.local/ns/ledger-api/sa/reporting`.
 * `istio-agent` returns this certificate to Envoy via the local in-memory **Secret Discovery Service (SDS)** socket.
 
-#### 2. Certificate Rotation
+#### B. Certificate Rotation
 * Workload certificates are ephemeral and short-lived (default lifetime is **24 hours**) to minimize the window of exposure if a key is compromised.
 * The background `istio-agent` continuously monitors the certificate's remaining validity.
 * When the certificate reaches **50% of its lifetime (12 hours remaining)**, the agent proactively initiates a new CSR negotiation.
 * The renewed certificate is pushed to Envoy dynamically through the SDS socket without terminating active TCP connections or restarting the container.
 
-#### 3. Trust Root
+#### C. Trust Root
 * The root of trust is defined by the CA certificate loaded into `istiod`.
 * By default, `istiod` generates a self-signed root CA certificate.
 * For PCI-DSS and Enterprise environments, `istiod` is configured as an Intermediate CA by injecting certificates from your corporate Root CA into a Kubernetes secret named `cacerts` inside the `istio-system` namespace.
 * This root/intermediate certificate chain is distributed to all Envoy proxies at startup, allowing them to mutually authenticate peer certificates signed by the same trust anchor during the TLS handshake.
+
+---
+
+### Pod Security Standards (PSS) & Istio Injection Compatibility
+* We configure the `ledger-api` namespace to enforce the **`privileged`** security profile while generating warnings and audit trails on the **`restricted`** standard.
+* **Why Privileged is enforced:** The default Istio sidecar initialization container (`istio-init`) requires root permissions (`runAsUser: 0`) and elevated network capabilities (`NET_ADMIN`, `NET_RAW`) to set up iptables packet redirection rules. Since these configurations violate both the `restricted` and `baseline` PSS profiles, enforcing `privileged` is required to allow the Istio sidecars to spin up successfully while still auditing and warning on any non-compliant workload settings.
+
+---
+
+## Proof of Verification (Screenshots)
+
+### 1. ArgoCD Status & Ingress Gateway TLS Verification
+Verification of the healthy and synced ArgoCD Application status alongside the Istio Ingress Gateway HTTPS TLS handshake termination (showing `subject: CN=ledger-api.local; O=LedgerAPI Corp` and the expected Zero-Trust `403 Forbidden` / `RBAC: access denied` response):
+
+![ArgoCD and Ingress Gateway Verification](C:/Users/vinay/.gemini/antigravity-ide/brain/3ed6de03-0b04-4f30-a3ee-f518255e451e/media__1785429803455.png)
+
+### 2. GitHub Actions Secure Pipeline Run (Task 2)
+Verification of the successful GitHub Actions run `#23` demonstrating that all scanning gates (Gitleaks, Semgrep, Trivy) succeeded, the image was pushed to GHCR, keylessly signed, and OIDC SLSA build provenance was generated:
+
+![GHA Secure Pipeline Run](C:/Users/vinay/.gemini/antigravity-ide/brain/3ed6de03-0b04-4f30-a3ee-f518255e451e/media__1785429946314.png)
+
+### 3. Kyverno Policy Guardrail Rejection (Task 1 Bonus)
+Verification of Kyverno dynamically intercepting and blocking insecure container deployments (e.g. attempting to deploy with `:latest` image tag and attempting to run as root):
+
+![Kyverno Admission Rejection](C:/Users/vinay/.gemini/antigravity-ide/brain/3ed6de03-0b04-4f30-a3ee-f518255e451e/media__1785429892328.png)
