@@ -5,3 +5,11 @@ deploy/secrets.yaml
 TASK_INSTRUCTIONS.md
 
 cosign.*
+
+deploy/ledger-api.*
+
+SESSION_RECAP.md
+
+istio-1.25.2/
+istio-*/
+istio/
