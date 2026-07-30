@@ -82,6 +82,8 @@ spec:
                     value: "*:*"
 
 ---
+
+
 apiVersion: kyverno.io/v1
 kind: ClusterPolicy
 metadata:
@@ -109,3 +111,7 @@ spec:
             MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEyc1xcQdaPxvv4IDOvzV85onRLF28
             EsG4yBjqQijbNT2BQpuHwnjzKFxRz4xh53GcjfgYFLMQgQxrAsi+Dhwa9A==
             -----END PUBLIC KEY-----
+
+
+
+
