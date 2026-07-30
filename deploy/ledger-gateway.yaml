@@ -24,15 +24,20 @@ metadata:
   namespace: ledger-api
 spec:
   host: ledger-api
-  subsets:
-  - name: stable
-    labels:
-      # Stable subset template hash
-      rollouts-pod-template-hash: "7b4dcb7549"
-  - name: canary
-    labels:
-      # Canary subset template hash (e.g. your secondary replicaset)
-      rollouts-pod-template-hash: "6f4559bd96"
+  trafficPolicy:
+    tls:
+      mode: ISTIO_MUTUAL
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: DestinationRule
+metadata:
+  name: ledger-api-canary-destination
+  namespace: ledger-api
+spec:
+  host: ledger-api-canary
+  trafficPolicy:
+    tls:
+      mode: ISTIO_MUTUAL
 ---
 apiVersion: networking.istio.io/v1alpha3
 kind: VirtualService
@@ -49,9 +54,8 @@ spec:
     route:
     - destination:
         host: ledger-api
-        subset: stable
-      weight: 80
+      weight: 100
     - destination:
-        host: ledger-api
-        subset: canary
-      weight: 20
+        host: ledger-api-canary
+      weight: 0
+
