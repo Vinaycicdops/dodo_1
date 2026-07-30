@@ -1,0 +1,125 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  namespace: ledger-api
+spec:
+  podSelector: {}
+  policyTypes:
+  - Ingress
+  - Egress
+
+---
+
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-mesh-traffic
+  namespace: ledger-api
+spec:
+  podSelector:
+    matchLabels:
+      app: ledger-api
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app: reporting
+    ports:
+    - protocol: TCP
+      port: 8080
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: ingress-nginx
+    ports:
+    - protocol: TCP
+      port: 8080
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: istio-system
+    ports:
+    - protocol: TCP
+      port: 15012
+    - protocol: TCP
+      port: 15017
+  egress:
+  # Allow ledger-api egress to DNS (kube-system)
+  - to:
+    - namespaceSelector: {}
+    ports:
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 53
+  # Allow ledger-api egress to Istio Control Plane
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: istio-system
+    ports:
+    - protocol: TCP
+      port: 15012
+    - protocol: TCP
+      port: 15017
+
+---
+
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-reporting-traffic
+  namespace: ledger-api
+spec:
+  podSelector:
+    matchLabels:
+      app: reporting
+  policyTypes:
+  - Egress
+  egress:
+  # Allow reporting egress to DNS
+  - to:
+    - namespaceSelector: {}
+    ports:
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 53
+  # Allow reporting egress to ledger-api
+  - to:
+    - podSelector:
+        matchLabels:
+          app: ledger-api
+    ports:
+    - protocol: TCP
+      port: 8080
+  # Allow reporting egress to Istio Control Plane
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: istio-system
+    ports:
+    - protocol: TCP
+      port: 15012
+    - protocol: TCP
+      port: 15017
+---
+# incase reporting wants to access outside world
+# apiVersion: networking.istio.io/v1alpha3
+# kind: ServiceEntry
+# metadata:
+#   name: google-external
+#   namespace: ledger-api
+# spec:
+#   hosts:
+#   - www.google.com
+#   ports:
+#   - number: 443
+#     name: https
+#     protocol: TLS
+#   resolution: DNS
+#   location: MESH_EXTERNAL

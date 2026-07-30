@@ -1,0 +1,57 @@
+apiVersion: networking.istio.io/v1alpha3
+kind: Gateway
+metadata:
+  name: ledger-gateway
+  namespace: ledger-api
+spec:
+  selector:
+    istio: ingressgateway # Matches default Istio Ingress Gateway controller
+  servers:
+  - port:
+      number: 443
+      name: https
+      protocol: HTTPS
+    tls:
+      mode: SIMPLE
+      credentialName: ledger-api-certs # Secret located in istio-system namespace
+    hosts:
+    - "ledger-api.local"
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: DestinationRule
+metadata:
+  name: ledger-api-destination
+  namespace: ledger-api
+spec:
+  host: ledger-api
+  subsets:
+  - name: stable
+    labels:
+      # Stable subset template hash
+      rollouts-pod-template-hash: "7b4dcb7549"
+  - name: canary
+    labels:
+      # Canary subset template hash (e.g. your secondary replicaset)
+      rollouts-pod-template-hash: "6f4559bd96"
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: ledger-api-virtualservice
+  namespace: ledger-api
+spec:
+  hosts:
+  - "ledger-api.local"
+  gateways:
+  - ledger-gateway
+  http:
+  - name: primary # Used by Argo Rollouts to locate the route
+    route:
+    - destination:
+        host: ledger-api
+        subset: stable
+      weight: 80
+    - destination:
+        host: ledger-api
+        subset: canary
+      weight: 20

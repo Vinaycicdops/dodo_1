@@ -21,6 +21,7 @@ spec:
                 - argocd
                 - ingress-nginx
                 - argo-rollouts
+                - istio-system
       match:
         any:
           - resources:
@@ -56,6 +57,7 @@ spec:
                 - argocd
                 - ingress-nginx
                 - argo-rollouts
+                - istio-system
       match:
         any:
           - resources:

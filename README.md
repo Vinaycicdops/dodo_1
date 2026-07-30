@@ -2,6 +2,8 @@
 
 This repository contains the end-to-end hardened deployments, security guardrails, and secure delivery CI/CD configurations for `ledger-api` in compliance with PCI DSS standards.
 
+> 📖 **Session Log & Checklist:** For a complete log of today's work and tomorrow's review instructions, see [SESSION_RECAP.md](SESSION_RECAP.md).
+
 ---
 
 ## Task 1 — Deploy & Harden the Workload
@@ -67,3 +69,30 @@ We enforce three ClusterPolicies in [deploy/kyverno-policies.yaml](deploy/kyvern
 * **`disallow-root`:** Blocks any deployment running as root.
 * **`disallow-latest-tag`:** Rejects containers matching `*:latest` or with no tag.
 * **`verify-image-signatures`:** Rejects any image that does not possess a valid Cosign signature matching the public key block in the policy.
+
+---
+
+## Task 3 — Service Mesh & Zero-Trust (Istio)
+
+### Workload Identity Architecture (SPIFFE/mTLS)
+
+#### 1. Certificate Issuance & Identity Projection
+* Each pod is injected with an `istio-proxy` sidecar containing the `istio-agent` daemon.
+* On startup, `istio-agent` constructs a standard **Certificate Signing Request (CSR)** and generates a private key.
+* `istio-agent` sends this CSR to the central Control Plane CA (`istiod`) over a secure gRPC connection.
+* To authenticate, it passes a local Kubernetes-projected ServiceAccount token (mounted dynamically inside `/var/run/secrets/tokens/istio-token` with the custom audience `istio-ca`).
+* `istiod` verifies the token's signature using the Kubernetes token review API, maps it to the pod's identity, and signs an X.509 certificate.
+* The issued certificate contains a **Subject Alternative Name (SAN)** representing the workload's cryptographic identity using the **SPIFFE ID** standard, e.g., `spiffe://cluster.local/ns/ledger-api/sa/reporting`.
+* `istio-agent` returns this certificate to Envoy via the local in-memory **Secret Discovery Service (SDS)** socket.
+
+#### 2. Certificate Rotation
+* Workload certificates are ephemeral and short-lived (default lifetime is **24 hours**) to minimize the window of exposure if a key is compromised.
+* The background `istio-agent` continuously monitors the certificate's remaining validity.
+* When the certificate reaches **50% of its lifetime (12 hours remaining)**, the agent proactively initiates a new CSR negotiation.
+* The renewed certificate is pushed to Envoy dynamically through the SDS socket without terminating active TCP connections or restarting the container.
+
+#### 3. Trust Root
+* The root of trust is defined by the CA certificate loaded into `istiod`.
+* By default, `istiod` generates a self-signed root CA certificate.
+* For PCI-DSS and Enterprise environments, `istiod` is configured as an Intermediate CA by injecting certificates from your corporate Root CA into a Kubernetes secret named `cacerts` inside the `istio-system` namespace.
+* This root/intermediate certificate chain is distributed to all Envoy proxies at startup, allowing them to mutually authenticate peer certificates signed by the same trust anchor during the TLS handshake.

@@ -7,6 +7,12 @@ spec:
   replicas: 3
   strategy:
     canary:
+      trafficRouting:
+        istio:
+          virtualService:
+            name: ledger-api-virtualservice
+            routes:
+            - primary
       # Step-by-step promotion instructions
       steps:
         # Route 20% of traffic to the new version (Canary)
