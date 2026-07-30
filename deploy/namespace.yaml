@@ -3,6 +3,7 @@ kind: Namespace
 metadata:
   name: ledger-api
   labels:
+    istio-injection: enabled
     # Enforce baseline to allow Istio sidecars to initialize successfully
     pod-security.kubernetes.io/enforce: baseline
     pod-security.kubernetes.io/enforce-version: latest
