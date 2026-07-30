@@ -33,7 +33,11 @@ spec:
           spec:
             securityContext:
               runAsNonRoot: true
+
+
 ---
+
+
 apiVersion: kyverno.io/v1
 kind: ClusterPolicy
 metadata:
@@ -76,7 +80,11 @@ spec:
                   - key: "{{ element.image }}"
                     operator: NotEquals
                     value: "*:*"
+
+
 ---
+
+
 apiVersion: kyverno.io/v1
 kind: ClusterPolicy
 metadata:
