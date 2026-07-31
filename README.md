@@ -78,6 +78,98 @@ gh attestation verify oci://ghcr.io/vinaycicdops/dodo_1:<COMMIT_SHA> --owner Vin
 
 ---
 
+## Security Scanning with Trivy
+
+### Container Vulnerability Scan
+
+The application container is scanned using **Trivy** as part of the security validation process.
+
+#### Scan Command
+
+```bash
+trivy image \
+  --severity HIGH,CRITICAL \
+  --ignore-unfixed \
+  --exit-code 1 \
+  --format table \
+  myapp:latest
+```
+
+#### Results
+
+After upgrading to **Python 3.12**, updating Python dependencies, and rebuilding the image with a clean virtual environment:
+
+* ✅ No **HIGH** or **CRITICAL** vulnerabilities were found in the Debian operating system packages.
+* ✅ The application runtime uses:
+
+  * Python 3.12
+  * pip 26.2
+  * setuptools 83.0.0
+* ✅ All application dependencies are updated to secure versions.
+
+#### Remaining Findings
+
+Trivy reports two remaining HIGH severity findings:
+
+| Package    | Advisory            | Reason                                                                                                   |
+| ---------- | ------------------- | -------------------------------------------------------------------------------------------------------- |
+| msgpack    | GHSA-6v7p-g79w-8964 | Detected inside pip's vendored libraries rather than as an application dependency.                       |
+| setuptools | CVE-2025-47273      | Scanner detects metadata from the base image even though the application runtime uses setuptools 83.0.0. |
+
+These findings were investigated and verified:
+
+* `pip show setuptools` reports **83.0.0**.
+* `pip show msgpack` reports **Package not found**.
+* The application executes using `/opt/venv/bin/python`.
+* The reported `msgpack` exists only as a vendored library within `pip` and is not imported by the application.
+
+Therefore, these findings are considered **non-exploitable for the application runtime** and are documented as accepted residual risks rather than unresolved vulnerabilities.
+
+### CI/CD Integration
+
+#### Recommended Trivy Command
+
+Use this in your CI/CD pipeline to scan your container image:
+
+```bash
+trivy image \
+  --severity HIGH,CRITICAL \
+  --ignore-unfixed \
+  --exit-code 1 \
+  --format table \
+  ghcr.io/vinaycicdops/dodo_1:latest
+```
+
+This configuration ensures that:
+* Only **HIGH** and **CRITICAL** vulnerabilities are evaluated.
+* Vulnerabilities without an available fix are ignored (`--ignore-unfixed`).
+* The pipeline fails (`--exit-code 1`) only when actionable **HIGH** or **CRITICAL** vulnerabilities are present.
+
+#### Suppressing Accepted Residual Findings
+
+If your organization requires suppressing the two verified residual findings (`GHSA-6v7p-g79w-8964` and `CVE-2025-47273`), add them to your `.trivyignore` file:
+
+```text
+GHSA-6v7p-g79w-8964
+CVE-2025-47273
+```
+
+Then, execute Trivy referencing the ignore file:
+
+```bash
+trivy image \
+  --severity HIGH,CRITICAL \
+  --ignore-unfixed \
+  --ignorefile .trivyignore \
+  --exit-code 1 \
+  --format table \
+  ghcr.io/vinaycicdops/dodo_1:latest
+```
+
+This keeps the pipeline strict while allowing it to ignore only the two investigated findings.
+
+---
+
 ## Cluster Policy Guardrails (Kyverno)
 
 We enforce three ClusterPolicies in [deploy/kyverno-policies.yaml](deploy/kyverno-policies.yaml):

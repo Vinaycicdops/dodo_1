@@ -1,10 +1,12 @@
 # Stage 1: Build dependencies in a virtual environment
-FROM python:3.9-slim AS builder
+FROM python:3.12-slim AS builder
 
 # Install system dependencies needed for compiling Python packages if necessary
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
-    && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && \
+    apt-get upgrade -y && \
+    apt-get install -y --no-install-recommends \
+        build-essential && \
+    rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
@@ -13,11 +15,19 @@ RUN python -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
 COPY requirements.txt .
-RUN pip install --no-cache-dir --upgrade pip && \
+
+RUN pip install --no-cache-dir --upgrade \
+    pip \
+    setuptools \
+    wheel && \
     pip install --no-cache-dir -r requirements.txt
 
 # Stage 2: Create the minimal runner image
-FROM python:3.9-slim AS runner
+FROM python:3.12-slim AS runner
+
+LABEL org.opencontainers.image.title="Flask Demo"
+LABEL org.opencontainers.image.vendor="Vinay"
+LABEL org.opencontainers.image.source="https://github.com/<your-repo>"
 
 # Create a non-privileged system user and group
 RUN groupadd -g 10001 -r appgroup && \

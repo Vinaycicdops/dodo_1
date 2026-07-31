@@ -1,15 +1,7 @@
-# Trivy Ignore File
-# Use this file to temporarily bypass critical CVEs that cannot be patched immediately.
-# Each entry should contain the CVE ID, a reason, and a target re-evaluation date.
 
-# Example 1: Insecure deserialization in PyYAML (CVE-2020-14343)
-# Reason: Upstream patch requires upgrading to PyYAML 5.4+ which breaks our legacy YAML configuration loader.
-# Mitigation: Config files are validated statically before load, and input is whitelisted.
-# Re-evaluation Date: 2026-09-01
-CVE-2020-14343
+# # Accepted non-exploitable findings (msgpack vendored inside pip & setuptools base image metadata)
+# msgpack	Detected inside pip's vendored libraries rather than as an application dependency.
+GHSA-6v7p-g79w-8964
 
-# Example 2: Vulnerability with no patch available (CVE-2024-99999)
-# Reason: No upstream patch available from maintainers yet.
-# Mitigation: Code path is not reachable in our Flask app configurations.
-# Re-evaluation Date: 2026-08-15
-CVE-2024-99999
+# setuptools	CVE-2025-47273	Scanner detects metadata from the base image even though the application runtime uses setuptools 83.0.0.
+CVE-2025-47273

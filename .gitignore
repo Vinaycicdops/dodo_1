@@ -13,3 +13,5 @@ SESSION_RECAP.md
 istio-1.25.2/
 istio-*/
 istio/
+
+app/trivy-*
